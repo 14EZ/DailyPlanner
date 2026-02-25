@@ -37,7 +37,7 @@ const getDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const FOOTER_WORDS = ["Sasha", "Nikita", "real niggas", "crazy bitches", "Putin"];
+const FOOTER_WORDS = ["real niggas", "crazy bitches", "Putin", "Most Nikitiev", "Alexandra", "pretty boyz", "6/10"];
 
 const formatTime = (time: string) => {
   const [hourStr, minute] = time.split(':');
@@ -47,9 +47,23 @@ const formatTime = (time: string) => {
   return `${formattedHour}:${minute} ${ampm}`;
 };
 
+interface TimeSlotProps {
+  time: string;
+  dateKey: string;
+  planText: string;
+  isCurrentSlot: boolean;
+  isEditing: boolean;
+  onEdit: (time: string, currentText: string) => void;
+  onSave: (time: string) => void;
+  onCancel: () => void;
+  onDelete: (time: string) => void;
+  editValue: string;
+  setEditValue: (value: string) => void;
+}
+
 const MemoizedTimeSlot = memo(function TimeSlot({
   time, dateKey, planText, isCurrentSlot, isEditing, onEdit, onSave, onCancel, onDelete, editValue, setEditValue
-}) {
+}: TimeSlotProps) {
   const hasPlan = !!planText;
 
   return (
@@ -136,19 +150,23 @@ const MemoizedTimeSlot = memo(function TimeSlot({
 
 export default function App() {
   const [plans, setPlans] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('daily-planner-plans');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const migrated: Record<string, string> = {};
-      const todayKey = getDateKey(new Date());
-      for (const [key, value] of Object.entries(parsed)) {
-        if (!key.includes('_')) {
-          migrated[`${todayKey}_${key}`] = value as string;
-        } else {
-          migrated[key] = value as string;
+    try {
+      const saved = localStorage.getItem('daily-planner-plans');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const migrated: Record<string, string> = {};
+        const todayKey = getDateKey(new Date());
+        for (const [key, value] of Object.entries(parsed)) {
+          if (!key.includes('_')) {
+            migrated[`${todayKey}_${key}`] = value as string;
+          } else {
+            migrated[key] = value as string;
+          }
         }
+        return migrated;
       }
-      return migrated;
+    } catch (e) {
+      console.error('Failed to load plans from localStorage', e);
     }
     return {};
   });
@@ -164,10 +182,10 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState(new Date());
   
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    "Morning": true,
-    "Afternoon": true,
-    "Evening": true,
-    "Night": true
+    "Morning": false,
+    "Afternoon": false,
+    "Evening": false,
+    "Night": false
   });
 
   const [footerWord, setFooterWord] = useState(FOOTER_WORDS[0]);
@@ -245,17 +263,18 @@ export default function App() {
       
       setTimeout(() => {
         const element = document.getElementById(`slot-${timeString}`);
-        if (element) {
-          const headerOffset = 100;
+        const header = document.querySelector('header');
+        if (element && header) {
+          const headerHeight = header.offsetHeight;
           const elementPosition = element.getBoundingClientRect().top;
-          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          const offsetPosition = elementPosition + window.pageYOffset - headerHeight - 20; // Added 20px extra padding
           
           window.scrollTo({
             top: offsetPosition,
             behavior: 'smooth'
           });
         }
-      }, 50);
+      }, 100);
     }, 100);
   }, [isToday]);
 

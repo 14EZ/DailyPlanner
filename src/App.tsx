@@ -152,8 +152,8 @@ export default function App() {
       <header className="bg-black/80 backdrop-blur-md border-b border-zinc-900 sticky top-0 z-10">
         <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium tracking-tight text-zinc-100">
-              Daily Planner
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
+              FuckingPlanner <span className="text-lg sm:text-xl font-medium text-zinc-500">by oldpetrus</span>
             </h1>
             <div className="flex items-center gap-4 mt-2">
               <div className="flex items-center gap-1 bg-zinc-900/50 rounded-md border border-zinc-800 p-0.5">
@@ -171,13 +171,13 @@ export default function App() {
           </div>
           <button
             onClick={scrollToCurrentTime}
-            className={`flex items-center gap-2 px-4 py-1.5 bg-transparent border rounded-full text-xs font-mono transition-all self-start sm:self-auto cursor-pointer ${
+            className={`flex items-center gap-2 px-5 py-2 bg-transparent border rounded-full text-sm font-mono transition-all self-start sm:self-auto cursor-pointer ${
               isToday 
                 ? 'border-zinc-800 hover:border-zinc-600 hover:bg-zinc-900 text-zinc-400 hover:text-zinc-200' 
                 : 'border-zinc-600 bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
             }`}
           >
-            <Target className="w-3.5 h-3.5" />
+            <Target className="w-4 h-4" />
             {isToday ? 'NOW' : 'TODAY'}
           </button>
         </div>
@@ -196,7 +196,7 @@ export default function App() {
               <div
                 key={time}
                 id={`slot-${time}`}
-                className={`group flex items-start py-4 border-b border-zinc-900 transition-colors relative ${
+                className={`group flex items-start py-5 sm:py-6 border-b border-zinc-900 transition-colors relative ${
                   isCurrentSlot ? 'bg-zinc-900/20' : ''
                 }`}
               >
@@ -204,7 +204,7 @@ export default function App() {
                   <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zinc-400" />
                 )}
                 
-                <div className={`w-20 sm:w-24 shrink-0 pt-1 flex items-center gap-2 font-mono text-xs ${isCurrentSlot ? 'text-zinc-200' : 'text-zinc-600'}`}>
+                <div className={`w-24 sm:w-28 shrink-0 pt-0.5 flex items-center gap-2 font-mono text-sm sm:text-base ${isCurrentSlot ? 'text-zinc-200 font-medium' : 'text-zinc-500'}`}>
                   {formatTime(time)}
                 </div>
 

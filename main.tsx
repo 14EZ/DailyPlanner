@@ -88,34 +88,16 @@ const MemoizedTimeSlot = memo(function TimeSlot({
               autoFocus
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
+              onBlur={() => onSave(time)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  onSave(time);
-                }
-                if (e.key === 'Escape') {
-                  onCancel();
+                  e.currentTarget.blur();
                 }
               }}
               placeholder="Type your plan..."
               className="w-full bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none min-h-[60px] text-sm sm:text-base font-light"
             />
-            <div className="flex flex-col gap-2 shrink-0">
-              <button
-                onClick={() => onSave(time)}
-                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-                title="Save (Enter)"
-              >
-                <Check className="w-5 h-5" />
-              </button>
-              <button
-                onClick={onCancel}
-                className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-                title="Cancel (Esc)"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
           </div>
         ) : (
           <div
@@ -132,18 +114,6 @@ const MemoizedTimeSlot = memo(function TimeSlot({
           </div>
         )}
       </div>
-
-      {!isEditing && hasPlan && (
-        <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-1">
-          <button
-            onClick={() => onDelete(time)}
-            className="p-1 text-zinc-700 hover:text-zinc-400 transition-colors cursor-pointer"
-            title="Delete plan"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      )}
     </div>
   );
 });
@@ -419,10 +389,11 @@ export default function App() {
       </main>
 
       <footer className="border-t border-zinc-900 bg-black/50 py-6 mt-auto">
-        <div className="max-w-3xl mx-auto px-4 text-center">
+        <div className="max-w-3xl mx-auto px-4 text-center flex flex-col items-center gap-1">
           <p className="text-zinc-500 text-sm font-light">
-            For <span className="text-zinc-300 font-medium transition-all duration-300 inline-block min-w-[100px]">{footerWord}</span> with love, truly yours <span className="text-zinc-400 font-mono">@oldpetrus</span>
+            For <span className="text-zinc-300 font-medium transition-all duration-300 inline-block min-w-[100px]">{footerWord}</span> with fucking care
           </p>
+          <p className="text-zinc-400 font-mono text-sm">@lampactstudios</p>
         </div>
       </footer>
     </div>

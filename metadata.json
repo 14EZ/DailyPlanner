@@ -1,5 +1,8 @@
-{
-  "name": "Daily Planner",
-  "description": "A simple daily planner with 30-minute intervals.",
-  "requestFramePermissions": []
-}
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Plus, Trash2, Check, X, Target, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
+import { Clock, Plus, Trash2, Check, X, Target, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 const generateTimeSlots = () => {
   const slots = [];
@@ -15,12 +15,124 @@ const generateTimeSlots = () => {
 
 const TIME_SLOTS = generateTimeSlots();
 
+const TIME_GROUPS = {
+  "Morning": { start: "06:00", end: "11:30" },
+  "Afternoon": { start: "12:00", end: "15:30" },
+  "Evening": { start: "16:00", end: "21:30" },
+  "Night": { start: "22:00", end: "05:30" }
+};
+
+const getGroupForTime = (time: string) => {
+  const hour = parseInt(time.split(':')[0], 10);
+  if (hour >= 6 && hour < 12) return "Morning";
+  if (hour >= 12 && hour < 16) return "Afternoon";
+  if (hour >= 16 && hour < 22) return "Evening";
+  return "Night";
+};
+
 const getDateKey = (date: Date) => {
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const FOOTER_WORDS = ["Sasha", "Nikita", "real niggas", "crazy bitches", "Putin"];
+
+const formatTime = (time: string) => {
+  const [hourStr, minute] = time.split(':');
+  const hour = parseInt(hourStr, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const formattedHour = hour % 12 || 12;
+  return `${formattedHour}:${minute} ${ampm}`;
+};
+
+const MemoizedTimeSlot = memo(function TimeSlot({
+  time, dateKey, planText, isCurrentSlot, isEditing, onEdit, onSave, onCancel, onDelete, editValue, setEditValue
+}) {
+  const hasPlan = !!planText;
+
+  return (
+    <div
+      id={`slot-${time}`}
+      className={`group flex items-start py-5 sm:py-6 border-b border-zinc-900/50 last:border-b-0 transition-colors relative px-4 ${
+        isCurrentSlot ? 'bg-zinc-900/40' : ''
+      }`}
+    >
+      {isCurrentSlot && (
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zinc-400" />
+      )}
+      
+      <div className={`w-24 sm:w-28 shrink-0 pt-0.5 flex items-center gap-2 font-mono text-sm sm:text-base ${isCurrentSlot ? 'text-zinc-200 font-medium' : 'text-zinc-500'}`}>
+        {formatTime(time)}
+      </div>
+
+      <div className="flex-1 min-w-0 pl-2 sm:pl-4">
+        {isEditing ? (
+          <div className="flex items-start gap-3">
+            <textarea
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSave(time);
+                }
+                if (e.key === 'Escape') {
+                  onCancel();
+                }
+              }}
+              placeholder="Type your plan..."
+              className="w-full bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none min-h-[60px] text-sm sm:text-base font-light"
+            />
+            <div className="flex flex-col gap-2 shrink-0">
+              <button
+                onClick={() => onSave(time)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Save (Enter)"
+              >
+                <Check className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onCancel}
+                className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+                title="Cancel (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => onEdit(time, planText)}
+            className="min-h-[1.5rem] cursor-text group/edit"
+          >
+            {hasPlan ? (
+              <div className="whitespace-pre-wrap text-sm sm:text-base font-light text-zinc-300 leading-relaxed">{planText}</div>
+            ) : (
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs font-mono text-zinc-700 pt-1">
+                <Plus className="w-3 h-3" /> ADD PLAN
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!isEditing && hasPlan && (
+        <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-1">
+          <button
+            onClick={() => onDelete(time)}
+            className="p-1 text-zinc-700 hover:text-zinc-400 transition-colors cursor-pointer"
+            title="Delete plan"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default function App() {
   const [plans, setPlans] = useState<Record<string, string>>(() => {
@@ -50,9 +162,18 @@ export default function App() {
   const [editingSlot, setEditingSlot] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    "Morning": true,
+    "Afternoon": true,
+    "Evening": true,
+    "Night": true
+  });
 
-  const dateKey = getDateKey(selectedDate);
-  const isToday = dateKey === getDateKey(currentTime);
+  const [footerWord, setFooterWord] = useState(FOOTER_WORDS[0]);
+
+  const dateKey = useMemo(() => getDateKey(selectedDate), [selectedDate]);
+  const isToday = useMemo(() => dateKey === getDateKey(new Date()), [dateKey]);
 
   useEffect(() => {
     localStorage.setItem('daily-planner-plans', JSON.stringify(plans));
@@ -65,12 +186,23 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  const handleEdit = (time: string, currentText: string) => {
+  useEffect(() => {
+    const wordTimer = setInterval(() => {
+      setFooterWord((current) => {
+        const availableWords = FOOTER_WORDS.filter(w => w !== current);
+        const randomIndex = Math.floor(Math.random() * availableWords.length);
+        return availableWords[randomIndex];
+      });
+    }, 4000);
+    return () => clearInterval(wordTimer);
+  }, []);
+
+  const handleEdit = useCallback((time: string, currentText: string) => {
     setEditingSlot(time);
     setEditValue(currentText || '');
-  };
+  }, []);
 
-  const handleSave = (time: string) => {
+  const handleSave = useCallback((time: string) => {
     const fullKey = `${dateKey}_${time}`;
     if (editValue.trim() === '') {
       const newPlans = { ...plans };
@@ -81,29 +213,21 @@ export default function App() {
     }
     setEditingSlot(null);
     setEditValue('');
-  };
+  }, [dateKey, editValue, plans]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditingSlot(null);
     setEditValue('');
-  };
+  }, []);
 
-  const handleDelete = (time: string) => {
+  const handleDelete = useCallback((time: string) => {
     const fullKey = `${dateKey}_${time}`;
     const newPlans = { ...plans };
     delete newPlans[fullKey];
     setPlans(newPlans);
-  };
+  }, [dateKey, plans]);
 
-  const formatTime = (time: string) => {
-    const [hourStr, minute] = time.split(':');
-    const hour = parseInt(hourStr, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const formattedHour = hour % 12 || 12;
-    return `${formattedHour}:${minute} ${ampm}`;
-  };
-
-  const scrollToCurrentTime = () => {
+  const scrollToCurrentTime = useCallback(() => {
     if (!isToday) {
       const d = new Date();
       d.setHours(0, 0, 0, 0);
@@ -111,45 +235,80 @@ export default function App() {
     }
     
     setTimeout(() => {
-      const hour = currentTime.getHours().toString().padStart(2, '0');
-      const minute = currentTime.getMinutes() >= 30 ? '30' : '00';
+      const now = new Date();
+      const hour = now.getHours().toString().padStart(2, '0');
+      const minute = now.getMinutes() >= 30 ? '30' : '00';
       const timeString = `${hour}:${minute}`;
       
-      const element = document.getElementById(`slot-${timeString}`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+      const group = getGroupForTime(timeString);
+      setExpandedGroups(prev => ({ ...prev, [group]: true }));
+      
+      setTimeout(() => {
+        const element = document.getElementById(`slot-${timeString}`);
+        if (element) {
+          const headerOffset = 100;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      }, 50);
     }, 100);
-  };
+  }, [isToday]);
 
-  const handlePrevDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
+  const handlePrevDay = useCallback(() => {
+    setSelectedDate(d => {
+      const newDate = new Date(d);
+      newDate.setDate(newDate.getDate() - 1);
+      return newDate;
+    });
     setEditingSlot(null);
-  };
+  }, []);
 
-  const handleNextDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setSelectedDate(newDate);
+  const handleNextDay = useCallback(() => {
+    setSelectedDate(d => {
+      const newDate = new Date(d);
+      newDate.setDate(newDate.getDate() + 1);
+      return newDate;
+    });
     setEditingSlot(null);
-  };
+  }, []);
 
-  const displayDate = selectedDate.toLocaleDateString('en-US', {
+  const toggleGroup = useCallback((group: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [group]: !prev[group]
+    }));
+  }, []);
+
+  const displayDate = useMemo(() => selectedDate.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: selectedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-  });
+  }), [selectedDate]);
 
-  const currentHour = currentTime.getHours().toString().padStart(2, '0');
-  const currentMinuteSlot = currentTime.getMinutes() >= 30 ? '30' : '00';
-  const currentSlotString = `${currentHour}:${currentMinuteSlot}`;
+  const currentSlotString = useMemo(() => {
+    const hour = currentTime.getHours().toString().padStart(2, '0');
+    const minute = currentTime.getMinutes() >= 30 ? '30' : '00';
+    return `${hour}:${minute}`;
+  }, [currentTime]);
+
+  const groupedSlots = useMemo(() => TIME_SLOTS.reduce((acc, time) => {
+    const group = getGroupForTime(time);
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(time);
+    return acc;
+  }, {} as Record<string, string[]>), []);
+
+  const orderedGroups = ["Morning", "Afternoon", "Evening", "Night"];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-200 font-sans pb-12 selection:bg-zinc-800">
-      <header className="bg-black/80 backdrop-blur-md border-b border-zinc-900 sticky top-0 z-10">
+    <div className="min-h-screen bg-black text-zinc-200 font-sans flex flex-col selection:bg-zinc-800">
+      <header className="bg-black/80 backdrop-blur-md border-b border-zinc-900 sticky top-0 z-50">
         <div className="max-w-3xl mx-auto px-4 py-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-zinc-100">
@@ -183,92 +342,55 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-4 py-8">
-        <div className="border-t border-zinc-900">
-          {TIME_SLOTS.map((time) => {
-            const isEditing = editingSlot === time;
-            const fullKey = `${dateKey}_${time}`;
-            const planText = plans[fullKey];
-            const hasPlan = !!planText;
-            const isCurrentSlot = isToday && time === currentSlotString;
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-8">
+        <div className="space-y-6">
+          {orderedGroups.map((groupName) => {
+            const slots = groupedSlots[groupName];
+            const isExpanded = expandedGroups[groupName];
+            const timeRange = TIME_GROUPS[groupName as keyof typeof TIME_GROUPS];
+            
+            const hasPlansInGroup = slots.some(time => !!plans[`${dateKey}_${time}`]);
 
             return (
-              <div
-                key={time}
-                id={`slot-${time}`}
-                className={`group flex items-start py-5 sm:py-6 border-b border-zinc-900 transition-colors relative ${
-                  isCurrentSlot ? 'bg-zinc-900/20' : ''
-                }`}
-              >
-                {isCurrentSlot && (
-                  <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zinc-400" />
-                )}
-                
-                <div className={`w-24 sm:w-28 shrink-0 pt-0.5 flex items-center gap-2 font-mono text-sm sm:text-base ${isCurrentSlot ? 'text-zinc-200 font-medium' : 'text-zinc-500'}`}>
-                  {formatTime(time)}
-                </div>
-
-                <div className="flex-1 min-w-0 pl-2 sm:pl-4">
-                  {isEditing ? (
-                    <div className="flex items-start gap-3">
-                      <textarea
-                        autoFocus
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSave(time);
-                          }
-                          if (e.key === 'Escape') {
-                            handleCancel();
-                          }
-                        }}
-                        placeholder="Type your plan..."
-                        className="w-full bg-zinc-900/50 border border-zinc-800 rounded-md px-3 py-2 text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:border-zinc-600 resize-none min-h-[60px] text-sm sm:text-base font-light"
-                      />
-                      <div className="flex flex-col gap-2 shrink-0">
-                        <button
-                          onClick={() => handleSave(time)}
-                          className="p-1.5 text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer"
-                          title="Save (Enter)"
-                        >
-                          <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-                          title="Cancel (Esc)"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+              <div key={groupName} className="border border-zinc-900 rounded-xl overflow-hidden bg-zinc-950/50">
+                <button
+                  onClick={() => toggleGroup(groupName)}
+                  className="w-full flex items-center justify-between p-4 bg-zinc-900/30 hover:bg-zinc-900/50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-medium text-zinc-200">{groupName}</h2>
+                    <span className="text-xs font-mono text-zinc-500">
+                      {formatTime(timeRange.start)} - {formatTime(timeRange.end)}
+                    </span>
+                    {hasPlansInGroup && !isExpanded && (
+                      <div className="w-2 h-2 rounded-full bg-zinc-400 ml-2" />
+                    )}
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-zinc-500" />
                   ) : (
-                    <div
-                      onClick={() => handleEdit(time, planText)}
-                      className="min-h-[1.5rem] cursor-text group/edit"
-                    >
-                      {hasPlan ? (
-                        <div className="whitespace-pre-wrap text-sm sm:text-base font-light text-zinc-300 leading-relaxed">{planText}</div>
-                      ) : (
-                        <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs font-mono text-zinc-700 pt-1">
-                          <Plus className="w-3 h-3" /> ADD PLAN
-                        </span>
-                      )}
-                    </div>
+                    <ChevronDown className="w-5 h-5 text-zinc-500" />
                   )}
-                </div>
+                </button>
 
-                {!isEditing && hasPlan && (
-                  <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-1">
-                    <button
-                      onClick={() => handleDelete(time)}
-                      className="p-1 text-zinc-700 hover:text-zinc-400 transition-colors cursor-pointer"
-                      title="Delete plan"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                {isExpanded && (
+                  <div className="border-t border-zinc-900">
+                    {slots.map((time) => (
+                      <MemoizedTimeSlot
+                        key={time}
+                        time={time}
+                        dateKey={dateKey}
+                        planText={plans[`${dateKey}_${time}`]}
+                        isCurrentSlot={isToday && time === currentSlotString}
+                        isEditing={editingSlot === time}
+                        onEdit={handleEdit}
+                        onSave={handleSave}
+                        onCancel={handleCancel}
+                        onDelete={handleDelete}
+                        editValue={editingSlot === time ? editValue : ''}
+                        setEditValue={setEditValue}
+                      />
+                    ))}
                   </div>
                 )}
               </div>
@@ -276,6 +398,14 @@ export default function App() {
           })}
         </div>
       </main>
+
+      <footer className="border-t border-zinc-900 bg-black/50 py-6 mt-auto">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <p className="text-zinc-500 text-sm font-light">
+            For <span className="text-zinc-300 font-medium transition-all duration-300 inline-block min-w-[100px]">{footerWord}</span> with love, truly yours <span className="text-zinc-400 font-mono">@oldpetrus</span>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }

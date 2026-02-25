@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Clock, Plus, Trash2, Check, X, Target, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 
 const generateTimeSlots = () => {
@@ -39,6 +39,101 @@ const getDateKey = (date: Date) => {
 
 const FOOTER_WORDS = ["Sasha", "Nikita", "real niggas", "crazy bitches", "Putin"];
 
+const formatTime = (time: string) => {
+  const [hourStr, minute] = time.split(':');
+  const hour = parseInt(hourStr, 10);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const formattedHour = hour % 12 || 12;
+  return `${formattedHour}:${minute} ${ampm}`;
+};
+
+const MemoizedTimeSlot = memo(function TimeSlot({
+  time, dateKey, planText, isCurrentSlot, isEditing, onEdit, onSave, onCancel, onDelete, editValue, setEditValue
+}) {
+  const hasPlan = !!planText;
+
+  return (
+    <div
+      id={`slot-${time}`}
+      className={`group flex items-start py-5 sm:py-6 border-b border-zinc-900/50 last:border-b-0 transition-colors relative px-4 ${
+        isCurrentSlot ? 'bg-zinc-900/40' : ''
+      }`}
+    >
+      {isCurrentSlot && (
+        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zinc-400" />
+      )}
+      
+      <div className={`w-24 sm:w-28 shrink-0 pt-0.5 flex items-center gap-2 font-mono text-sm sm:text-base ${isCurrentSlot ? 'text-zinc-200 font-medium' : 'text-zinc-500'}`}>
+        {formatTime(time)}
+      </div>
+
+      <div className="flex-1 min-w-0 pl-2 sm:pl-4">
+        {isEditing ? (
+          <div className="flex items-start gap-3">
+            <textarea
+              autoFocus
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  onSave(time);
+                }
+                if (e.key === 'Escape') {
+                  onCancel();
+                }
+              }}
+              placeholder="Type your plan..."
+              className="w-full bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none min-h-[60px] text-sm sm:text-base font-light"
+            />
+            <div className="flex flex-col gap-2 shrink-0">
+              <button
+                onClick={() => onSave(time)}
+                className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
+                title="Save (Enter)"
+              >
+                <Check className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onCancel}
+                className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
+                title="Cancel (Esc)"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={() => onEdit(time, planText)}
+            className="min-h-[1.5rem] cursor-text group/edit"
+          >
+            {hasPlan ? (
+              <div className="whitespace-pre-wrap text-sm sm:text-base font-light text-zinc-300 leading-relaxed">{planText}</div>
+            ) : (
+              <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs font-mono text-zinc-700 pt-1">
+                <Plus className="w-3 h-3" /> ADD PLAN
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {!isEditing && hasPlan && (
+        <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-1">
+          <button
+            onClick={() => onDelete(time)}
+            className="p-1 text-zinc-700 hover:text-zinc-400 transition-colors cursor-pointer"
+            title="Delete plan"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
 export default function App() {
   const [plans, setPlans] = useState<Record<string, string>>(() => {
     const saved = localStorage.getItem('daily-planner-plans');
@@ -77,8 +172,8 @@ export default function App() {
 
   const [footerWord, setFooterWord] = useState(FOOTER_WORDS[0]);
 
-  const dateKey = getDateKey(selectedDate);
-  const isToday = dateKey === getDateKey(currentTime);
+  const dateKey = useMemo(() => getDateKey(selectedDate), [selectedDate]);
+  const isToday = useMemo(() => dateKey === getDateKey(new Date()), [dateKey]);
 
   useEffect(() => {
     localStorage.setItem('daily-planner-plans', JSON.stringify(plans));
@@ -102,12 +197,12 @@ export default function App() {
     return () => clearInterval(wordTimer);
   }, []);
 
-  const handleEdit = (time: string, currentText: string) => {
+  const handleEdit = useCallback((time: string, currentText: string) => {
     setEditingSlot(time);
     setEditValue(currentText || '');
-  };
+  }, []);
 
-  const handleSave = (time: string) => {
+  const handleSave = useCallback((time: string) => {
     const fullKey = `${dateKey}_${time}`;
     if (editValue.trim() === '') {
       const newPlans = { ...plans };
@@ -118,29 +213,21 @@ export default function App() {
     }
     setEditingSlot(null);
     setEditValue('');
-  };
+  }, [dateKey, editValue, plans]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setEditingSlot(null);
     setEditValue('');
-  };
+  }, []);
 
-  const handleDelete = (time: string) => {
+  const handleDelete = useCallback((time: string) => {
     const fullKey = `${dateKey}_${time}`;
     const newPlans = { ...plans };
     delete newPlans[fullKey];
     setPlans(newPlans);
-  };
+  }, [dateKey, plans]);
 
-  const formatTime = (time: string) => {
-    const [hourStr, minute] = time.split(':');
-    const hour = parseInt(hourStr, 10);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const formattedHour = hour % 12 || 12;
-    return `${formattedHour}:${minute} ${ampm}`;
-  };
-
-  const scrollToCurrentTime = () => {
+  const scrollToCurrentTime = useCallback(() => {
     if (!isToday) {
       const d = new Date();
       d.setHours(0, 0, 0, 0);
@@ -148,14 +235,13 @@ export default function App() {
     }
     
     setTimeout(() => {
-      const hour = currentTime.getHours().toString().padStart(2, '0');
-      const minute = currentTime.getMinutes() >= 30 ? '30' : '00';
+      const now = new Date();
+      const hour = now.getHours().toString().padStart(2, '0');
+      const minute = now.getMinutes() >= 30 ? '30' : '00';
       const timeString = `${hour}:${minute}`;
       
       const group = getGroupForTime(timeString);
-      if (!expandedGroups[group]) {
-        setExpandedGroups(prev => ({ ...prev, [group]: true }));
-      }
+      setExpandedGroups(prev => ({ ...prev, [group]: true }));
       
       setTimeout(() => {
         const element = document.getElementById(`slot-${timeString}`);
@@ -171,48 +257,53 @@ export default function App() {
         }
       }, 50);
     }, 100);
-  };
+  }, [isToday]);
 
-  const handlePrevDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
+  const handlePrevDay = useCallback(() => {
+    setSelectedDate(d => {
+      const newDate = new Date(d);
+      newDate.setDate(newDate.getDate() - 1);
+      return newDate;
+    });
     setEditingSlot(null);
-  };
+  }, []);
 
-  const handleNextDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setSelectedDate(newDate);
+  const handleNextDay = useCallback(() => {
+    setSelectedDate(d => {
+      const newDate = new Date(d);
+      newDate.setDate(newDate.getDate() + 1);
+      return newDate;
+    });
     setEditingSlot(null);
-  };
+  }, []);
 
-  const toggleGroup = (group: string) => {
+  const toggleGroup = useCallback((group: string) => {
     setExpandedGroups(prev => ({
       ...prev,
       [group]: !prev[group]
     }));
-  };
+  }, []);
 
-  const displayDate = selectedDate.toLocaleDateString('en-US', {
+  const displayDate = useMemo(() => selectedDate.toLocaleDateString('en-US', {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
     year: selectedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-  });
+  }), [selectedDate]);
 
-  const currentHour = currentTime.getHours().toString().padStart(2, '0');
-  const currentMinuteSlot = currentTime.getMinutes() >= 30 ? '30' : '00';
-  const currentSlotString = `${currentHour}:${currentMinuteSlot}`;
+  const currentSlotString = useMemo(() => {
+    const hour = currentTime.getHours().toString().padStart(2, '0');
+    const minute = currentTime.getMinutes() >= 30 ? '30' : '00';
+    return `${hour}:${minute}`;
+  }, [currentTime]);
 
-  const groupedSlots = TIME_SLOTS.reduce((acc, time) => {
+  const groupedSlots = useMemo(() => TIME_SLOTS.reduce((acc, time) => {
     const group = getGroupForTime(time);
     if (!acc[group]) acc[group] = [];
     acc[group].push(time);
     return acc;
-  }, {} as Record<string, string[]>);
+  }, {} as Record<string, string[]>), []);
 
-  // Ensure groups are displayed in the correct order
   const orderedGroups = ["Morning", "Afternoon", "Evening", "Night"];
 
   return (
@@ -258,7 +349,6 @@ export default function App() {
             const isExpanded = expandedGroups[groupName];
             const timeRange = TIME_GROUPS[groupName as keyof typeof TIME_GROUPS];
             
-            // Check if any slot in this group has a plan
             const hasPlansInGroup = slots.some(time => !!plans[`${dateKey}_${time}`]);
 
             return (
@@ -285,95 +375,22 @@ export default function App() {
 
                 {isExpanded && (
                   <div className="border-t border-zinc-900">
-                    {slots.map((time) => {
-                      const isEditing = editingSlot === time;
-                      const fullKey = `${dateKey}_${time}`;
-                      const planText = plans[fullKey];
-                      const hasPlan = !!planText;
-                      const isCurrentSlot = isToday && time === currentSlotString;
-
-                      return (
-                        <div
-                          key={time}
-                          id={`slot-${time}`}
-                          className={`group flex items-start py-5 sm:py-6 border-b border-zinc-900/50 last:border-b-0 transition-colors relative px-4 ${
-                            isCurrentSlot ? 'bg-zinc-900/40' : ''
-                          }`}
-                        >
-                          {isCurrentSlot && (
-                            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-zinc-400" />
-                          )}
-                          
-                          <div className={`w-24 sm:w-28 shrink-0 pt-0.5 flex items-center gap-2 font-mono text-sm sm:text-base ${isCurrentSlot ? 'text-zinc-200 font-medium' : 'text-zinc-500'}`}>
-                            {formatTime(time)}
-                          </div>
-
-                          <div className="flex-1 min-w-0 pl-2 sm:pl-4">
-                            {isEditing ? (
-                              <div className="flex items-start gap-3">
-                                <textarea
-                                  autoFocus
-                                  value={editValue}
-                                  onChange={(e) => setEditValue(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                      e.preventDefault();
-                                      handleSave(time);
-                                    }
-                                    if (e.key === 'Escape') {
-                                      handleCancel();
-                                    }
-                                  }}
-                                  placeholder="Type your plan..."
-                                  className="w-full bg-zinc-900/80 border border-zinc-700 rounded-md px-3 py-2 text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 resize-none min-h-[60px] text-sm sm:text-base font-light"
-                                />
-                                <div className="flex flex-col gap-2 shrink-0">
-                                  <button
-                                    onClick={() => handleSave(time)}
-                                    className="p-1.5 text-zinc-400 hover:text-zinc-200 transition-colors cursor-pointer"
-                                    title="Save (Enter)"
-                                  >
-                                    <Check className="w-5 h-5" />
-                                  </button>
-                                  <button
-                                    onClick={handleCancel}
-                                    className="p-1.5 text-zinc-600 hover:text-zinc-400 transition-colors cursor-pointer"
-                                    title="Cancel (Esc)"
-                                  >
-                                    <X className="w-5 h-5" />
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div
-                                onClick={() => handleEdit(time, planText)}
-                                className="min-h-[1.5rem] cursor-text group/edit"
-                              >
-                                {hasPlan ? (
-                                  <div className="whitespace-pre-wrap text-sm sm:text-base font-light text-zinc-300 leading-relaxed">{planText}</div>
-                                ) : (
-                                  <span className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-xs font-mono text-zinc-700 pt-1">
-                                    <Plus className="w-3 h-3" /> ADD PLAN
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {!isEditing && hasPlan && (
-                            <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 pt-1">
-                              <button
-                                onClick={() => handleDelete(time)}
-                                className="p-1 text-zinc-700 hover:text-zinc-400 transition-colors cursor-pointer"
-                                title="Delete plan"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {slots.map((time) => (
+                      <MemoizedTimeSlot
+                        key={time}
+                        time={time}
+                        dateKey={dateKey}
+                        planText={plans[`${dateKey}_${time}`]}
+                        isCurrentSlot={isToday && time === currentSlotString}
+                        isEditing={editingSlot === time}
+                        onEdit={handleEdit}
+                        onSave={handleSave}
+                        onCancel={handleCancel}
+                        onDelete={handleDelete}
+                        editValue={editingSlot === time ? editValue : ''}
+                        setEditValue={setEditValue}
+                      />
+                    ))}
                   </div>
                 )}
               </div>

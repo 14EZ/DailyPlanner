@@ -37,7 +37,7 @@ const getDateKey = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const FOOTER_WORDS = ["real niggas", "crazy bitches", "Putin", "Most Nikitiev", "Alexandra", "pretty boyz", "6/10"];
+const FOOTER_WORDS = ["amatory girls", "comely gangsters", "fastidious nerds", "risible boyz", "rhadamanthine parents", "taciturn real G's", "uxorious husbands", "Most Nikitiev", "Alexandra Weedina", "myself"];
 
 const formatTime = (time: string) => {
   const [hourStr, minute] = time.split(':');
